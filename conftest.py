@@ -31,9 +31,18 @@ def my_logger():
     return logger
 
 
+@pytest.fixture
+def client_api(test_config, my_logger):
+    """REST client for testing"""
+    def _get_client(device):
+        return TestClient(my_logger, device_type=device, prefix_url=test_config.basic_url)
+    return _get_client
+
+
 @pytest.fixture(scope='session')
-def api_helper():
-    return Helper()
+def api_helper(test_config, my_logger):
+    """QA helper"""
+    return Helper(my_logger, prefix_url=test_config.basic_url)
 
 
 @pytest.fixture(scope='session')
@@ -55,18 +64,24 @@ def movie_maker(api_helper):
 
 
 @pytest.fixture(autouse=True, scope='function')
-def get_movies(my_logger, request):
+def get_movies(my_logger, request, test_config):
     def _get_movies(device):
         my_logger.debug(f"Start {request.node.name}")
-        client = TestClient(device_type=device)
+        client = TestClient(my_logger, prefix_url=test_config.basic_url, device_type=device)
         r = client.get_movies()
-        if r.status_code != 200:
-            my_logger.debug(f"{r.request.method} {r.request.url} ----> {r.status_code} {r.text}")
-        else:
-            my_logger.debug(f"{r.request.method} {r.request.url} ----> {r.status_code}")
         assert_that(r.status_code, equal_to(200))
         items = r.json()['items']
         assert_that(len(items), greater_than(0), f'There are no movies for {device}')
         my_logger.debug('\n'.join(str(x) for x in items))
         return items
     return _get_movies
+
+
+#@pytest.fixture(autouse=True, scope='session')
+#def setup_teardown(api_helper):
+#    """Global setup/teardown fixture
+#    """
+#    yield
+#    api_helper.delete_movies()
+#    api_helper.delete_services()
+

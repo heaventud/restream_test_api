@@ -6,10 +6,10 @@ import time
 class Helper:
     """This class allows access to the QA API
     """
-    def __init__(self, *args, **kwargs):
-        self.s = WrapSession(prefix_url="http://tools.restream.ru:8889", *args, **kwargs)
+    def __init__(self, logger, prefix_url='', *args, **kwargs):
+        self.s = WrapSession(prefix_url=prefix_url, *args, **kwargs)
         self.s.headers.update({'Accept': 'application/json'})
-        self.s.proxies.update({'http': 'http://127.0.0.1:8888'})
+        self.logger = logger
 
     def create_movie(self, **opts):
         """Method creates movie with options
@@ -24,6 +24,7 @@ class Helper:
             "services": opts.get('services', [])
         }
         r = self.s.post(path, json=json)
+        self.logger.debug(f"{r.request.method} {r.request.url} ----> {r.status_code} {r.text if r.text else ''}")
         r.raise_for_status()
         return r.json().get('id', None)
 
@@ -39,8 +40,24 @@ class Helper:
             "device_types": opts.get('device_types', [])
         }
         r = self.s.post(path, json=json)
+        self.logger.debug(
+            f"{r.request.method} {r.request.url} {r.request.body}----> {r.status_code} {r.text if r.text else ''}")
         r.raise_for_status()
         return r
+
+    def get_service(self, id_service):
+        """Method checks if service was created successfully"""
+        path = f'/qa/services/{id_service}'
+        i = 0
+        while i < 5:
+            r = self.s.get(path)
+            self.logger.debug(f"{r.request.method} {r.request.url} ----> {r.status_code} {r.text if r.text else ''}")
+            if r.status_code == 200:
+                break
+            i += 1
+            time.sleep(1)
+        else:
+            raise AssertionError(f'Service with id {id_service} is not created')
 
     def get_movie(self, id_movie):
         """Method checks if movie was created successfully
@@ -49,6 +66,7 @@ class Helper:
         i = 0
         while i < 5:
             r = self.s.get(path)
+            self.logger.debug(f"{r.request.method} {r.request.url} ----> {r.status_code} {r.text if r.text else ''}")
             if r.status_code == 200:
                 break
             i += 1
@@ -61,6 +79,7 @@ class Helper:
         """
         path = '/qa/services'
         r = self.s.delete(path)
+        self.logger.debug(f"{r.request.method} {r.request.url} ----> {r.status_code} {r.text if r.text else ''}")
         r.raise_for_status()
 
     def delete_movies(self):
@@ -68,4 +87,5 @@ class Helper:
         """
         path = '/qa/movies'
         r = self.s.delete(path)
+        self.logger.debug(f"{r.request.method} {r.request.url} ----> {r.status_code} {r.text if r.text else ''}")
         r.raise_for_status()
